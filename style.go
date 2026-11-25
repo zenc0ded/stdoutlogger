@@ -24,7 +24,8 @@ type Styles struct {
 	// Caller is the style for source caller.
 	Caller lipgloss.Style
 
-	// Prefix is the style for prefix.
+	// Prefix is not used by this exporter. It is kept to match
+	// charmbracelet/log.
 	Prefix lipgloss.Style
 
 	// Message is the style for messages.

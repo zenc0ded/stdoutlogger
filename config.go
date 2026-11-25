@@ -30,10 +30,13 @@ func newConfig(options []Option) config {
 	return cfg
 }
 
+// Option configures the exporter. Use the With functions to create one.
 type Option interface {
 	apply(config) config
 }
 
+// WithWriter sets where output is written. The default is os.Stdout.
+// A nil writer is ignored.
 func WithWriter(w io.Writer) Option {
 	return writerOption{w}
 }
@@ -47,6 +50,7 @@ func (o writerOption) apply(cfg config) config {
 	return cfg
 }
 
+// WithoutTimestamps removes the timestamp from each line.
 func WithoutTimestamps() Option {
 	return timestampsOption(false)
 }
@@ -58,6 +62,8 @@ func (o timestampsOption) apply(cfg config) config {
 	return cfg
 }
 
+// WithStyle sets the styles used for output. Start from DefaultStyles and
+// change what you need. The maps in style are copied.
 func WithStyle(style Styles) Option {
 	return styleOption(style)
 }
@@ -69,6 +75,7 @@ func (o styleOption) apply(cfg config) config {
 	return cfg
 }
 
+// WithoutSource removes the source location from each line.
 func WithoutSource() Option {
 	return sourceOption(false)
 }
