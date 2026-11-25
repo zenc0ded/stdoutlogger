@@ -30,3 +30,25 @@ jobs:
     - name: Build example
       working-directory: example
       run: go build -v ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
+
+    - name: Vet
+      run: go vet ./...
+
+    - name: Format
+      run: test -z "$(gofmt -l .)"
+
+    - name: Staticcheck
+      run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+    - name: Govulncheck
+      run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
