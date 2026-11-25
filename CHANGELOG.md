@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 - 2026-11-24
 
 ### Fixed
 - Output goes to the writer given to `WithWriter`. It was always written to `os.Stdout`.
