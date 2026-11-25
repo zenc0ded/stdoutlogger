@@ -8,7 +8,7 @@ An OpenTelemetry log exporter that prints records to stdout (or any writer) as s
 go get github.com/zenc0ded/stdoutlogger
 ```
 
-Requires Go 1.26 or newer. It depends on `go.opentelemetry.io/otel/log` and `sdk/log` v0.20.x. Newer versions changed the log value API and are not supported yet.
+Requires Go 1.26 or newer and `go.opentelemetry.io/otel/log` and `sdk/log` v1.47 or newer.
 
 ## Usage
 
@@ -44,7 +44,7 @@ A complete program is in [example/](example/main.go).
 
 ## Notes
 
-- The source location comes from the `code.function`, `code.filepath` and `code.lineno` attributes. If they are missing, no location is printed.
+- The source location comes from the `code.function.name`, `code.file.path` and `code.line.number` attributes (or the older `code.function`, `code.filepath` and `code.lineno`). If they are missing, no location is printed.
 - Colors are only used when the writer is a terminal.
 - Each record is written with a single `Write` call.
 

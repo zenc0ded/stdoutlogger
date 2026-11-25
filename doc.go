@@ -5,9 +5,10 @@
 //
 //	2006/01/02 15:04:05 INFO <pkg/file.go:12> message key="value" n=3
 //
-// The source location is built from the code.function, code.filepath and
-// code.lineno attributes, which the otelslog bridge sets when source
-// logging is enabled. Those attributes are not repeated in the key/value list.
+// The source location is built from the code.function.name, code.file.path
+// and code.line.number attributes (or the older code.function, code.filepath
+// and code.lineno), which the otelslog bridge sets when source logging is
+// enabled. Those attributes are not repeated in the key/value list.
 //
 // Output is styled with lipgloss. Colors are only used when the writer is a
 // terminal.
