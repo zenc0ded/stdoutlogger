@@ -6,28 +6,28 @@ import (
 	"strconv"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 // simple value to string extraction for types, no style is currently applied to these
-func stringify(v log.Value) string {
+func stringify(v attribute.Value) string {
 	strval := ""
 	// just do something sane for now
-	switch v.Kind() {
-	case log.KindString:
+	switch v.Type() {
+	case attribute.STRING:
 		// mirror charm and quote string values
 		strval = strconv.Quote(v.AsString())
-	case log.KindInt64:
+	case attribute.INT64:
 		strval = fmt.Sprint(v.AsInt64())
-	case log.KindFloat64:
+	case attribute.FLOAT64:
 		strval = fmt.Sprint(v.AsFloat64())
-	case log.KindBool:
+	case attribute.BOOL:
 		strval = fmt.Sprint(v.AsBool())
-	case log.KindBytes:
-		strval = fmt.Sprint(v.AsBytes())
-	case log.KindMap:
+	case attribute.BYTESLICE:
+		strval = fmt.Sprint(v.AsByteSlice())
+	case attribute.MAP:
 		m := v.AsMap()
 		strval = "{"
 		for i, kv := range m {
@@ -37,7 +37,7 @@ func stringify(v log.Value) string {
 			strval += fmt.Sprintf("%s%s%s", kv.Key, ":", stringify(kv.Value))
 		}
 		strval += "}"
-	case log.KindSlice:
+	case attribute.SLICE:
 		s := v.AsSlice()
 		strval = "["
 		for i, e := range s {
@@ -47,7 +47,15 @@ func stringify(v log.Value) string {
 			strval += stringify(e)
 		}
 		strval += "]"
-	case log.KindEmpty:
+	case attribute.BOOLSLICE:
+		strval = joinSlice(v.AsBoolSlice(), func(b bool) string { return fmt.Sprint(b) })
+	case attribute.INT64SLICE:
+		strval = joinSlice(v.AsInt64Slice(), func(i int64) string { return fmt.Sprint(i) })
+	case attribute.FLOAT64SLICE:
+		strval = joinSlice(v.AsFloat64Slice(), func(f float64) string { return fmt.Sprint(f) })
+	case attribute.STRINGSLICE:
+		strval = joinSlice(v.AsStringSlice(), strconv.Quote)
+	case attribute.EMPTY:
 		strval = "nil"
 	default:
 		strval = "INVALID_TYPE"
@@ -58,6 +66,14 @@ func stringify(v log.Value) string {
 // levelText renders the severity using the configured style. Severities
 // without an explicit style (e.g. INFO2, TRACE) fall back to the style of the
 // base level for their range.
+func joinSlice[T any](s []T, f func(T) string) string {
+	parts := make([]string, len(s))
+	for i, e := range s {
+		parts[i] = f(e)
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
 func (e *exporter) levelText(sev log.Severity) string {
 	st := e.style
 	if style, ok := st.Levels[sev]; ok {
@@ -109,25 +125,26 @@ func (e *exporter) renderRecord(record sdklog.Record) string {
 	// build msg string, start with record body and append attrs
 	body := record.Body()
 	bodyText := stringify(body)
-	if body.Kind() == log.KindString {
+	if body.Type() == attribute.STRING {
 		bodyText = body.AsString()
 	}
 	var msg strings.Builder
 	msg.WriteString(st.Message.Renderer(re).Render(bodyText))
 
 	// pull out certain attributes for source location, render the rest
-	record.WalkAttributes(func(kv log.KeyValue) bool {
-		k := kv.Key
+	record.WalkAttributes(func(kv attribute.KeyValue) bool {
+		k := string(kv.Key)
 		v := kv.Value
 		// NOTE: these attrs are used by the otelslog bridge, are there others used as standard?
 		switch k {
-		case string(semconv.CodeFilepathKey):
+		// older semconv names, then current names
+		case "code.filepath", "code.file.path":
 			filename = path.Base(v.AsString())
 
-		case string(semconv.CodeLineNumberKey):
+		case "code.lineno", "code.line.number":
 			lineno = v.AsInt64()
 
-		case string(semconv.CodeFunctionKey):
+		case "code.function", "code.function.name":
 			module = moduleFromFunction(v.AsString())
 
 		default:
