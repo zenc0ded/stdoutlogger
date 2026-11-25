@@ -7,13 +7,6 @@ import (
 
 // Composable options, in same style as otel stdout module
 
-var (
-	defaultWriter     io.Writer = os.Stdout
-	defaultTimestamps           = true
-	defaultSource               = true
-	defaultStyle                = DefaultStyles()
-)
-
 type config struct {
 	Writer     io.Writer // output to something other than os.Stdout
 	Timestamps bool      // prefix log lines with the timestamp
@@ -23,16 +16,16 @@ type config struct {
 
 func newConfig(options []Option) config {
 	cfg := config{
-		Writer:     defaultWriter,
-		Timestamps: defaultTimestamps,
-		Source:     defaultSource,
-		Style:      *defaultStyle,
+		Writer:     os.Stdout,
+		Timestamps: true,
+		Source:     true,
+		Style:      *DefaultStyles(),
 	}
 	for _, opt := range options {
 		cfg = opt.apply(cfg)
 	}
 	if cfg.Writer == nil {
-		cfg.Writer = defaultWriter
+		cfg.Writer = os.Stdout
 	}
 	return cfg
 }
@@ -72,7 +65,7 @@ func WithStyle(style Styles) Option {
 type styleOption Styles
 
 func (o styleOption) apply(cfg config) config {
-	cfg.Style = Styles(o)
+	cfg.Style = Styles(o).clone()
 	return cfg
 }
 

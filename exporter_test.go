@@ -213,12 +213,3 @@ func TestShutdownAndFlush(t *testing.T) {
 		t.Fatal(err)
 	}
 }
-
-func TestDefaultStyleNotMutatedByOptions(t *testing.T) {
-	s := DefaultStyles()
-	s.Keys["custom"] = s.Key
-	_ = newConfig([]Option{WithStyle(*s)})
-	if _, ok := defaultStyle.Keys["custom"]; ok {
-		t.Fatal("shared default style map was mutated")
-	}
-}

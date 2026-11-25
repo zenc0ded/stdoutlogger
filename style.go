@@ -9,6 +9,7 @@ package stdoutlogger
 //
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -60,6 +61,14 @@ func (s *Styles) styleForValue(key string) lipgloss.Style {
 		return vStyle
 	}
 	return s.Value
+}
+
+// clone returns a copy of s that does not share maps with s.
+func (s Styles) clone() Styles {
+	s.Levels = maps.Clone(s.Levels)
+	s.Keys = maps.Clone(s.Keys)
+	s.Values = maps.Clone(s.Values)
+	return s
 }
 
 // DefaultStyles returns the default styles.
