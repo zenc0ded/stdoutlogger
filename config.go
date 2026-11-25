@@ -31,6 +31,9 @@ func newConfig(options []Option) config {
 	for _, opt := range options {
 		cfg = opt.apply(cfg)
 	}
+	if cfg.Writer == nil {
+		cfg.Writer = defaultWriter
+	}
 	return cfg
 }
 

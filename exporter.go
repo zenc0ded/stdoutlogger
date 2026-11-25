@@ -2,12 +2,14 @@ package stdoutlogger
 
 import (
 	"context"
+	"io"
 
 	"github.com/charmbracelet/lipgloss"
 	"go.opentelemetry.io/otel/sdk/log"
 )
 
 type exporter struct {
+	writer     io.Writer
 	renderer   *lipgloss.Renderer
 	style      *Styles
 	timestamps bool
@@ -18,6 +20,7 @@ func New(options ...Option) (log.Exporter, error) {
 	cfg := newConfig(options)
 
 	e := exporter{
+		writer:     cfg.Writer,
 		renderer:   lipgloss.NewRenderer(cfg.Writer),
 		style:      &cfg.Style,
 		timestamps: cfg.Timestamps,
@@ -31,7 +34,10 @@ func (e *exporter) Export(ctx context.Context, records []log.Record) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		e.renderRecord(record)
+		// one Write per record keeps lines intact when the writer is shared
+		if _, err := io.WriteString(e.writer, e.renderRecord(record)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

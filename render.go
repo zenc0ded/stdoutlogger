@@ -2,8 +2,8 @@ package stdoutlogger
 
 import (
 	"fmt"
-	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"go.opentelemetry.io/otel/log"
@@ -18,7 +18,7 @@ func stringify(v log.Value) string {
 	switch v.Kind() {
 	case log.KindString:
 		// mirror charm and quote string values
-		strval = fmt.Sprintf("\"%s\"", v.AsString())
+		strval = strconv.Quote(v.AsString())
 	case log.KindInt64:
 		strval = fmt.Sprint(v.AsInt64())
 	case log.KindFloat64:
@@ -55,19 +55,65 @@ func stringify(v log.Value) string {
 	return strval
 }
 
-func (e *exporter) renderRecord(record sdklog.Record) {
+// levelText renders the severity using the configured style. Severities
+// without an explicit style (e.g. INFO2, TRACE) fall back to the style of the
+// base level for their range.
+func (e *exporter) levelText(sev log.Severity) string {
+	st := e.style
+	if style, ok := st.Levels[sev]; ok {
+		return style.Renderer(e.renderer).Render()
+	}
+	var base log.Severity
+	switch {
+	case sev >= log.SeverityFatal:
+		base = log.SeverityFatal
+	case sev >= log.SeverityError:
+		base = log.SeverityError
+	case sev >= log.SeverityWarn:
+		base = log.SeverityWarn
+	case sev >= log.SeverityInfo:
+		base = log.SeverityInfo
+	case sev >= log.SeverityTrace:
+		base = log.SeverityDebug
+	default:
+		return sev.String()
+	}
+	if style, ok := st.Levels[base]; ok {
+		return style.Renderer(e.renderer).Render()
+	}
+	return sev.String()
+}
+
+// moduleFromFunction extracts the package name from a fully qualified function
+// name such as "github.com/foo/bar.(*T).Method" -> "bar".
+func moduleFromFunction(fn string) string {
+	if i := strings.LastIndex(fn, "/"); i >= 0 {
+		fn = fn[i+1:]
+	}
+	if i := strings.Index(fn, "."); i >= 0 {
+		fn = fn[:i]
+	}
+	return fn
+}
+
+// renderRecord formats a record as a single newline terminated line.
+func (e *exporter) renderRecord(record sdklog.Record) string {
 	st := e.style
 	re := e.renderer
 	// try to track source from attributes to better output it
-	var module string = "main"
-	var filename string
+	var module, filename string
 	var lineno int64
 
 	attrSep := st.Separator.Renderer(re).Render("=")
 
 	// build msg string, start with record body and append attrs
+	body := record.Body()
+	bodyText := stringify(body)
+	if body.Kind() == log.KindString {
+		bodyText = body.AsString()
+	}
 	var msg strings.Builder
-	msg.WriteString(st.Message.Renderer(re).Render(record.Body().AsString()))
+	msg.WriteString(st.Message.Renderer(re).Render(bodyText))
 
 	// pull out certain attributes for source location, render the rest
 	record.WalkAttributes(func(kv log.KeyValue) bool {
@@ -82,8 +128,7 @@ func (e *exporter) renderRecord(record sdklog.Record) {
 			lineno = v.AsInt64()
 
 		case string(semconv.CodeFunctionKey):
-			// FIXME: handle empty split?
-			module = path.Base(strings.Split(v.AsString(), ".")[0])
+			module = moduleFromFunction(v.AsString())
 
 		default:
 			msg.WriteString(" ")
@@ -94,17 +139,33 @@ func (e *exporter) renderRecord(record sdklog.Record) {
 		return true
 	})
 
+	var line strings.Builder
 	if e.timestamps {
-		os.Stdout.WriteString(st.Timestamp.Renderer(re).Render(record.Timestamp().Format("2006/01/02 15:04:05")) + " ")
+		ts := record.Timestamp()
+		if ts.IsZero() {
+			ts = record.ObservedTimestamp()
+		}
+		if !ts.IsZero() {
+			line.WriteString(st.Timestamp.Renderer(re).Render(ts.Format("2006/01/02 15:04:05")))
+			line.WriteString(" ")
+		}
 	}
-	os.Stdout.WriteString(st.Levels[record.Severity()].Render(record.Severity().String()))
-	os.Stdout.WriteString(" ")
-	if e.source {
-		source := fmt.Sprintf("<%s/%s:%d>", module, filename, lineno)
-		os.Stdout.WriteString(st.Caller.Renderer(re).Render(source))
-		os.Stdout.WriteString(" ")
+	line.WriteString(e.levelText(record.Severity()))
+	line.WriteString(" ")
+	if e.source && (module != "" || filename != "") {
+		var source string
+		switch {
+		case filename == "":
+			source = fmt.Sprintf("<%s>", module)
+		case module == "":
+			source = fmt.Sprintf("<%s:%d>", filename, lineno)
+		default:
+			source = fmt.Sprintf("<%s/%s:%d>", module, filename, lineno)
+		}
+		line.WriteString(st.Caller.Renderer(re).Render(source))
+		line.WriteString(" ")
 	}
-	os.Stdout.WriteString(msg.String())
-
-	os.Stdout.WriteString("\n")
+	line.WriteString(msg.String())
+	line.WriteString("\n")
+	return line.String()
 }
